@@ -1,0 +1,10 @@
+[project]
+name = "actcamb"
+version = "0.0.0"
+description = "ACTCAMB likelihood intended for use with ACT lensing DR6."
+authors = [{name="Adam Neil Ormondroyd", email="Adam.Ormondroyd@gmail.com"}]
+readme = "README.md"
+dependencies = ["numpy", "scipy", "cobaya"]
+
+[project.urls]
+repository = "https://github.com/AdamOrmondroyd/actcamb"

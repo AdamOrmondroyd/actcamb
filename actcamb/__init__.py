@@ -1,1 +1,1 @@
-from actcamb import ACTCAMB
+from actcamb.actcamb import ACTCAMB
