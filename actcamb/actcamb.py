@@ -559,7 +559,7 @@ class ACTCAMB(ACTBoltzmannBase):
                     self.extra_attrs.get(
                         "max_l_tensor", self.extra_args.get("lmax"))}
         act_must_provide: InfoDict = {}
-        print(f"{must_provide=}")
+        # print(f"{must_provide=}")
         return must_provide
 
     def add_to_redshifts(self, z):
@@ -592,11 +592,11 @@ class ACTCAMB(ACTBoltzmannBase):
             method=method, z_pool=z_pool, kwargs=kwargs_with_z, args=args)
 
     def calculate(self, state, want_derived=True, **params_values_dict):
-        temp = {}
-        for k, v in params_values_dict.items():
-            if "ACT" == k[:3]:
-                temp[k[3:]] = v
-        params_values_dict = temp
+        # temp = {}
+        # for k, v in params_values_dict.items():
+        #     if "ACT" == k[:3]:
+        #         temp[k[3:]] = v
+        # params_values_dict = temp
         try:
             params, results = self.provider.get_ACTCAMB_transfers()
             if self.collectors or 'sigma8' in self.derived_extra:
@@ -813,6 +813,7 @@ class ACTCAMB(ACTBoltzmannBase):
 
     def set(self, params_values_dict, state):
         # Prepare parameters to be passed: this is called from the CambTransfers instance
+        # print(f"{state=}", flush=True)
         args = {self.translate_param(p): v for p, v in params_values_dict.items()}
         # Generate and save
         self.log.debug("Setting parameters: %r and %r", args, self.extra_args)
@@ -907,7 +908,7 @@ class ACTCAMB(ACTBoltzmannBase):
                                              dict(stop_at_error=self.stop_at_error),
                                              timing=self.timer)
         setattr(self._camb_transfers, "requires", self._transfer_requires)
-        return {'camb.transfers': self._camb_transfers}
+        return {'actcamb.transfers': self._camb_transfers}
 
     def get_speed(self):
         if self._measured_speed:
@@ -1007,9 +1008,7 @@ class ACTCambTransfers(HelperTheory):
         for name, mapped in self.cobaya_camb.renames.items():
             if mapped in supported_params:
                 supported_params.add(name)
-        print(f"{supported_params=}", flush=True)
         supported_params = set("ACT" + s for s in supported_params)
-        print(f"{supported_params=}", flush=True)
         return supported_params
 
     def get_allow_agnostic(self):
@@ -1028,11 +1027,14 @@ class ACTCambTransfers(HelperTheory):
 
     def calculate(self, state, want_derived=True, **params_values_dict):
         # Set parameters
-        temp = {}
-        for k, v in params_values_dict.items():
-            if "ACT" == k[:3]:
-                temp[k[3:]] = v
-        params_values_dict = temp
+        # print(f"{params_values_dict}", flush=True)
+        # temp = {}
+        # for k, v in params_values_dict.items():
+        #     if "ACT" == k[:3]:
+        #         temp[k[3:]] = v
+        # params_values_dict = temp
+        # print(f"{params_values_dict}", flush=True)
+        # print(f"{state=}", flush=True)
         camb_params = self.cobaya_camb.set(params_values_dict, state)
         # Failed to set parameters but no error raised
         # (e.g. out of computationally feasible range): lik=0

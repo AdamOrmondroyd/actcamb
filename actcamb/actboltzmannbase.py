@@ -42,7 +42,7 @@ class ACTBoltzmannBase(Theory):
         return True
 
     def translate_param(self, p):
-        return self.renames.get(p, p)
+        return self.renames.get(p, p)[3:]
 
     def get_param(self, p):
         translated = self.translate_param(p)
