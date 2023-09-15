@@ -221,7 +221,7 @@ import numpy as np
 from itertools import chain
 # Local
 from cobaya.component import ComponentNotInstalledError, load_external_module
-from actcamb.actboltzmannbase import ACTBoltzmannBase
+from cobaya.theories.cosmo import BoltzmannBase
 from cobaya.log import LoggedError, get_logger
 from cobaya.install import download_github_release, check_gcc_version
 from cobaya.tools import getfullargspec, get_class_methods, get_properties, \
@@ -245,7 +245,7 @@ class CAMBOutputs(NamedTuple):
     derived: dict
 
 
-class ACTCAMB(ACTBoltzmannBase):
+class CAMB(BoltzmannBase):
     r"""
     CAMB cosmological Boltzmann code \cite{Lewis:1999bs,Howlett:2012mh}.
     """
@@ -256,7 +256,7 @@ class ACTCAMB(ACTBoltzmannBase):
     _camb_min_gcc_version = "6.4"
     _min_camb_version = '1.5.0'
 
-    file_base_name = 'actcamb'
+    file_base_name = 'camb'
     external_primordial_pk: bool
     camb: Any
     ignore_obsolete: bool
@@ -304,9 +304,6 @@ class ACTCAMB(ACTBoltzmannBase):
                 self.camb.initialpower.InitialPower)
             self.initial_power_args, self.power_params = \
                 self._extract_params(power_spectrum.set_params)
-            self.power_params = [
-                "ACT"+arg for arg in self.power_params
-            ]
 
         nonlin = self.camb.CAMBparams.make_class_named(
             self.extra_args.get('non_linear_model',
@@ -316,7 +313,7 @@ class ACTCAMB(ACTBoltzmannBase):
         self.nonlin_args, self.nonlin_params = self._extract_params(nonlin.set_params)
 
         self.requires = str_to_list(getattr(self, "requires", []))
-        self._transfer_requires = ["ACT"+p for p in self.requires if
+        self._transfer_requires = [p for p in self.requires if
                                    p not in self.get_can_support_params()]
         self.requires = [p for p in self.requires if p not in self._transfer_requires]
 
@@ -343,23 +340,23 @@ class ACTCAMB(ACTBoltzmannBase):
             self.extra_attrs["WantTensors"] = True
             self.extra_attrs["Accuracy.AccurateBB"] = True
 
-        if "ACTsigma8" in self.input_params:
-            if "ACTAs" in self.input_params:
+        if "sigma8" in self.input_params:
+            if "As" in self.input_params:
                 raise LoggedError(self.log,
-                                  "Both ACTAs and ACTsigma8 have been provided as input. "
+                                  "Both As and sigma8 have been provided as input. "
                                   "This will likely cause ill-defined outputs.")
             self.extra_attrs["WantTransfer"] = True
             self.add_to_redshifts([0.])
 
     def initialize_with_provider(self, provider):
-        if "ACTsigma8" in self.input_params or "ACTAs" in self.output_params:
+        if "sigma8" in self.input_params or "As" in self.output_params:
             if not self.needs_perts:
-                raise LoggedError(self.log, "Using ACTsigma8 as input or ACTAs as output "
+                raise LoggedError(self.log, "Using sigma8 as input or As as output "
                                             "but not using any power spectrum results")
             if (power_model := self.extra_args.get('initial_power_model')) and not \
                     isinstance(self.camb.CAMBparams.make_class_named(power_model),
                                self.camb.initialpower.InitialPowerLaw):
-                raise LoggedError(self.log, "Using ACTsigma8 as an input and ACTAs as an "
+                raise LoggedError(self.log, "Using sigma8 as an input and As as an "
                                             "output is only supported for power law "
                                             "initial power spectra.")
         super().initialize_with_provider(provider)
@@ -367,7 +364,7 @@ class ACTCAMB(ACTBoltzmannBase):
     def get_can_support_params(self):
         params = self.power_params + self.nonlin_params
         if not self.external_primordial_pk:
-            params += ["ACTsigma8"]
+            params += ["sigma8"]
         return params
 
     def get_allow_agnostic(self):
@@ -375,15 +372,15 @@ class ACTCAMB(ACTBoltzmannBase):
 
     def set_cl_reqs(self, reqs):
         """
-        Sets some common settings for both lensed and unlensed ACTCl's.
+        Sets some common settings for both lensed and unlensed Cl's.
         """
         self.extra_args["lmax"] = max(
             max(reqs.values()), self.extra_args.get("lmax", 0))
         self.needs_perts = True
         self.extra_attrs["Want_CMB"] = True
         self.extra_attrs["WantCls"] = True
-        if 'ACTTCMB' not in self.derived_extra:
-            self.derived_extra += ['ACTTCMB']
+        if 'TCMB' not in self.derived_extra:
+            self.derived_extra += ['TCMB']
 
     def must_provide(self, **requirements):
         # Computed quantities required by the likelihoods
@@ -397,11 +394,10 @@ class ACTCAMB(ACTBoltzmannBase):
         # accumulated, i.e. taking the max of precision requests, etc.
         super().must_provide(**requirements)
         CAMBdata = self.camb.CAMBdata
-        # self.log.debug(f"{requirements}")
 
         for k, v in self._must_provide.items():
             # Products and other computations
-            if k == "ACTCl":
+            if k == "Cl":
                 self.set_cl_reqs(v)
                 cls = [a.lower() for a in v]
                 needs_lensing = set(cls).intersection({"pp", "pt", "pe", "tp", "ep"})
@@ -420,39 +416,39 @@ class ACTCAMB(ACTBoltzmannBase):
                                                               1) >= 1
                 if set(cls).intersection({"pt", "pe", "tp", "ep"}):
                     self._needs_lensing_cross = True
-            elif k == "ACTunlensed_Cl":
+            elif k == "unlensed_Cl":
                 self.set_cl_reqs(v)
                 self.collectors[k] = Collector(
                     method=CAMBdata.get_cmb_power_spectra,
                     kwargs={"spectra": ["unlensed_total"], "raw_cl": False})
-            elif k == "ACTHubble":
+            elif k == "Hubble":
                 self.set_collector_with_z_pool(k, v["z"], CAMBdata.h_of_z)
-            elif k in ["ACTOmega_b", "ACTOmega_cdm", "ACTOmega_nu_massive"]:
+            elif k in ["Omega_b", "Omega_cdm", "Omega_nu_massive"]:
                 varnames = {
                     "Omega_b": "baryon", "Omega_cdm": "cdm", "Omega_nu_massive": "nu"}
                 self.set_collector_with_z_pool(
                     k, v["z"], CAMBdata.get_Omega, kwargs={"var": varnames[k]})
-            elif k in ("ACTangular_diameter_distance", "ACTcomoving_radial_distance"):
+            elif k in ("angular_diameter_distance", "comoving_radial_distance"):
                 self.set_collector_with_z_pool(k, v["z"], getattr(CAMBdata, k))
-            elif k == "ACTangular_diameter_distance_2":
+            elif k == "angular_diameter_distance_2":
                 check_module_version(self.camb, '1.3.5')
                 self.set_collector_with_z_pool(
                     k, v["z_pairs"], CAMBdata.angular_diameter_distance2, d=2)
-            elif k == "ACTsigma8_z":
+            elif k == "sigma8_z":
                 self.add_to_redshifts(v["z"])
                 self.collectors[k] = Collector(
                     method=CAMBdata.get_sigma8,
                     kwargs={},
                     post=(lambda *x: x[::-1]))  # returned in inverse order
                 self.needs_perts = True
-            elif k == "ACTfsigma8":
+            elif k == "fsigma8":
                 self.add_to_redshifts(v["z"])
                 self.collectors[k] = Collector(
                     method=CAMBdata.get_fsigma8,
                     kwargs={},
                     post=(lambda *x: x[::-1]))  # returned in inverse order
                 self.needs_perts = True
-            elif isinstance(k, tuple) and k[0] == "ACTsigma_R":
+            elif isinstance(k, tuple) and k[0] == "sigma_R":
                 kwargs = v.copy()
                 self.extra_args["kmax"] = max(kwargs.pop("k_max"),
                                               self.extra_args.get("kmax", 0))
@@ -503,7 +499,7 @@ class ACTCAMB(ACTBoltzmannBase):
                     method=CAMBdata.get_linear_matter_power_spectrum,
                     kwargs=kwargs.copy())
                 self.needs_perts = True
-            elif k == "ACTsource_Cl":
+            elif k == "source_Cl":
                 if not getattr(self, "sources", None):
                     self.sources: InfoDict = {}
                 for source, window in v["sources"].items():
@@ -521,15 +517,15 @@ class ACTCAMB(ACTBoltzmannBase):
                 self.collectors[k] = Collector(method=CAMBdata.get_source_cls_dict)
                 self.extra_attrs["Want_cl_2D_array"] = True
                 self.extra_attrs["WantCls"] = True
-            elif k == 'ACTCAMBdata':
+            elif k == 'CAMBdata':
                 # Just get CAMB results object
                 self.collectors[k] = None
             elif v is None:
                 # General derived parameters
-                k_translated = k  # self.translate_param(k)
+                k_translated = self.translate_param(k)
                 if k_translated not in self.derived_extra:
                     self.derived_extra += [k_translated]
-                if k == "ACTsigma8":
+                if k == "sigma8":
                     self.extra_attrs["WantTransfer"] = True
                     self.needs_perts = True
                     self.add_to_redshifts([0.])
@@ -549,17 +545,15 @@ class ACTCAMB(ACTBoltzmannBase):
         self._base_params = None
 
         must_provide: InfoDict = {
-            'ACTCAMB_transfers': {'non_linear': self.non_linear_sources,
+            'CAMB_transfers': {'non_linear': self.non_linear_sources,
                                'needs_perts': self.needs_perts}}
         if self.external_primordial_pk and self.needs_perts:
-            must_provide['ACTprimordial_scalar_pk'] = {'lmax': self.extra_args.get("lmax"),
+            must_provide['primordial_scalar_pk'] = {'lmax': self.extra_args.get("lmax"),
                                                     'kmax': self.extra_args.get('kmax')}
             if self.extra_attrs.get('WantTensors'):
                 must_provide['primordial_tensor_pk'] = {'lmax':
                     self.extra_attrs.get(
                         "max_l_tensor", self.extra_args.get("lmax"))}
-        # act_must_provide: InfoDict = {}
-        # self.log.debug(f"{must_provide=}")
         return must_provide
 
     def add_to_redshifts(self, z):
@@ -592,14 +586,9 @@ class ACTCAMB(ACTBoltzmannBase):
             method=method, z_pool=z_pool, kwargs=kwargs_with_z, args=args)
 
     def calculate(self, state, want_derived=True, **params_values_dict):
-        # temp = {}
-        # for k, v in params_values_dict.items():
-        #     if "ACT" == k[:3]:
-        #         temp[k[3:]] = v
-        # params_values_dict = temp
         try:
-            params, results = self.provider.get_ACTCAMB_transfers()
-            if self.collectors or 'ACTsigma8' in self.derived_extra:
+            params, results = self.provider.get_CAMB_transfers()
+            if self.collectors or 'sigma8' in self.derived_extra:
                 if self.external_primordial_pk and self.needs_perts:
                     primordial_pk = self.provider.get_primordial_scalar_pk()
                     if primordial_pk.get('log_regular', True):
@@ -633,10 +622,10 @@ class ACTCAMB(ACTBoltzmannBase):
                     args.update(self.nonlin_args)
                     results.Params.NonLinearModel.set_params(**args)
                 results.power_spectra_from_transfer()
-                if "ACTsigma8" in params_values_dict:
+                if "sigma8" in params_values_dict:
                     sigma8 = results.get_sigma8_0()
                     results.Params.InitPower.As *= params_values_dict[
-                                                       "ACTsigma8"] ** 2 / sigma8 ** 2
+                                                       "sigma8"] ** 2 / sigma8 ** 2
                     results.power_spectra_from_transfer()
             for product, collector in self.collectors.items():
                 if collector:
@@ -667,9 +656,7 @@ class ACTCAMB(ACTBoltzmannBase):
             state["derived"] = self._get_derived_output(intermediates)
         # Prepare necessary extra derived parameters
         state["derived_extra"] = {
-            p: self._get_derived(self.translate_param(p), intermediates) for p in self.derived_extra}
-        self.log.debug(f"{state=}")
-        self.log.debug("end state")
+            p: self._get_derived(p, intermediates) for p in self.derived_extra}
 
     @staticmethod
     def _get_derived(p, intermediates):
@@ -705,25 +692,23 @@ class ACTCAMB(ACTBoltzmannBase):
         """
         derived = {}
         for p in self.output_params:
-            # self.log.debug(f"{p=}")
-            # self.log.debug(f"{self.translate_param(p)=}")
             derived[p] = self._get_derived(self.translate_param(p), intermediates)
             if derived[p] is None:
                 raise LoggedError(self.log, "Derived param '%s' not implemented"
                                             " in the CAMB interface", p)
         return derived
 
-    def _get_ACTCl(self, ell_factor=False, units="FIRASmuK2", lensed=True):
-        which_key = "ACTCl" if lensed else "ACTunlensed_Cl"
+    def _get_Cl(self, ell_factor=False, units="FIRASmuK2", lensed=True):
+        which_key = "Cl" if lensed else "unlensed_Cl"
         which_result = "total" if lensed else "unlensed_total"
         which_error = "lensed" if lensed else "unlensed"
         try:
             cl_camb = self.current_state[which_key][which_result].copy()
         except:
-            raise LoggedError(self.log, "No %s ACTCl's were computed. Are you sure that you "
+            raise LoggedError(self.log, "No %s Cl's were computed. Are you sure that you "
                                         "have requested them?", which_error)
         units_factor = self._cmb_unit_factor(
-            units, self.current_state['derived_extra']['ACTTCMB'])
+            units, self.current_state['derived_extra']['TCMB'])
         ls = np.arange(cl_camb.shape[0], dtype=np.int64)
         if not ell_factor:
             # unit conversion and ell_factor. CAMB output is *with* the factors already
@@ -737,7 +722,7 @@ class ACTCAMB(ACTBoltzmannBase):
         for sp, i in mapping.items():
             cls[sp] = cl_camb[:, i]
         if lensed:
-            cl_lens: Optional[np.ndarray] = self.current_state["ACTCl"].get("lens_potential")
+            cl_lens: Optional[np.ndarray] = self.current_state["Cl"].get("lens_potential")
             if cl_lens is not None:
                 cls["pp"] = cl_lens[:, 0].copy()
                 if not ell_factor:
@@ -751,11 +736,11 @@ class ACTCAMB(ACTBoltzmannBase):
                         cls[cross[::-1]] = cls[cross]
         return cls
 
-    def get_ACTCl(self, ell_factor=False, units="FIRASmuK2"):
-        return self._get_ACTCl(ell_factor=ell_factor, units=units, lensed=True)
+    def get_Cl(self, ell_factor=False, units="FIRASmuK2"):
+        return self._get_Cl(ell_factor=ell_factor, units=units, lensed=True)
 
-    def get_ACTunlensed_Cl(self, ell_factor=False, units="FIRASmuK2"):
-        return self._get_ACTCl(ell_factor=ell_factor, units=units, lensed=False)
+    def get_unlensed_Cl(self, ell_factor=False, units="FIRASmuK2"):
+        return self._get_Cl(ell_factor=ell_factor, units=units, lensed=False)
 
     def _get_z_dependent(self, quantity, z, _pool=None):
         # Partially reimplemented because of sigma8_z, etc, use different pool
@@ -764,13 +749,13 @@ class ACTCAMB(ACTBoltzmannBase):
             pool = self.z_pool_for_perturbations
         return super()._get_z_dependent(quantity, z, pool=pool)
 
-    def get_source_ACTCl(self):
+    def get_source_Cl(self):
         # get C_l^XX from the cosmological code
         try:
-            cls = deepcopy(self.current_state["source_ACTCl"])
+            cls = deepcopy(self.current_state["source_Cl"])
         except:
             raise LoggedError(
-                self.log, "No source ACTCl's were computed. "
+                self.log, "No source Cl's were computed. "
                           "Are you sure that you have requested some source?")
         cls_dict: dict = dict()
         for term, cl in cls.items():
@@ -781,21 +766,20 @@ class ACTCAMB(ACTBoltzmannBase):
         cls_dict["ell"] = np.arange(cls[list(cls)[0]].shape[0])
         return cls_dict
 
-    def get_ACTCAMBdata(self):
+    def get_CAMBdata(self):
         """
         Get the CAMB result object (must have been requested as a requirement).
 
         :return: CAMB's `CAMBdata <https://camb.readthedocs.io/en/latest/results.html>`_
                  result instance for the current parameters
         """
-        return self.current_state['ACTCAMBdata']
+        return self.current_state['CAMBdata']
 
     def get_can_provide_params(self):
         # possible derived parameters for derived_extra, excluding things that are
         # only input parameters.
         params_derived = list(get_class_methods(self.camb.CAMBparams))
         params_derived.remove("custom_source_names")
-        params_derived = ['ACT' + p for p in params_derived]
         fields = []
         # noinspection PyProtectedMember
         for f, tp in self.camb.CAMBparams._fields_:
@@ -811,7 +795,6 @@ class ACTCAMB(ACTBoltzmannBase):
             if mapped in names:
                 names.append(name)
         # remove any parameters explicitly tagged as input requirements
-        names = ['ACT' + n for n in names]
         return set(names).difference(chain(self._transfer_requires, self.requires))
 
     def get_version(self):
@@ -819,7 +802,6 @@ class ACTCAMB(ACTBoltzmannBase):
 
     def set(self, params_values_dict, state):
         # Prepare parameters to be passed: this is called from the CambTransfers instance
-        # self.log.debug(f"{state=}")
         args = {self.translate_param(p): v for p, v in params_values_dict.items()}
         # Generate and save
         self.log.debug("Setting parameters: %r and %r", args, self.extra_args)
@@ -910,11 +892,11 @@ class ACTCAMB(ACTBoltzmannBase):
         Transfer functions are computed separately by camb.transfers, then this
         class uses the transfer functions to calculate power spectra (using A_s, n_s etc).
         """
-        self._camb_transfers = ACTCambTransfers(self, 'actcamb.transfers',
+        self._camb_transfers = CambTransfers(self, 'camb.transfers',
                                              dict(stop_at_error=self.stop_at_error),
                                              timing=self.timer)
         setattr(self._camb_transfers, "requires", self._transfer_requires)
-        return {'actcamb.transfers': self._camb_transfers}
+        return {'camb.transfers': self._camb_transfers}
 
     def get_speed(self):
         if self._measured_speed:
@@ -989,7 +971,7 @@ class ACTCAMB(ACTBoltzmannBase):
         return True
 
 
-class ACTCambTransfers(HelperTheory):
+class CambTransfers(HelperTheory):
     """
     Helper theory class that calculates transfer functions only. The result is cached
     when only initial power spectrum or non-linear model parameters change
@@ -1014,7 +996,6 @@ class ACTCambTransfers(HelperTheory):
         for name, mapped in self.cobaya_camb.renames.items():
             if mapped in supported_params:
                 supported_params.add(name)
-        supported_params = set("ACT" + s for s in supported_params)
         return supported_params
 
     def get_allow_agnostic(self):
@@ -1022,25 +1003,17 @@ class ACTCambTransfers(HelperTheory):
 
     def must_provide(self, **requirements):
         super().must_provide(**requirements)
-        opts = requirements.get('ACTCAMB_transfers')
+        opts = requirements.get('CAMB_transfers')
         if opts:
             self.non_linear_sources = opts['non_linear']
             self.needs_perts = opts['needs_perts']
         self.cobaya_camb.check_no_repeated_input_extra()
 
-    def get_ACTCAMB_transfers(self):
+    def get_CAMB_transfers(self):
         return self.current_state['results']
 
     def calculate(self, state, want_derived=True, **params_values_dict):
         # Set parameters
-        # self.log.debug(f"{params_values_dict}")
-        # temp = {}
-        # for k, v in params_values_dict.items():
-        #     if "ACT" == k[:3]:
-        #         temp[k[3:]] = v
-        # params_values_dict = temp
-        # self.log.debug(f"{params_values_dict}")
-        # self.log.debug(f"{state=}")
         camb_params = self.cobaya_camb.set(params_values_dict, state)
         # Failed to set parameters but no error raised
         # (e.g. out of computationally feasible range): lik=0

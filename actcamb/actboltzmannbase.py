@@ -20,7 +20,7 @@ from cobaya.typing import empty_dict, InfoDict
 H_units_conv_factor = {"1/Mpc": 1, "km/s/Mpc": Const.c_km_s}
 
 
-class ACTBoltzmannBase(Theory):
+class BoltzmannBase(Theory):
     _is_abstract = True
     renames: Mapping[str, str] = empty_dict
     extra_args: InfoDict
@@ -42,14 +42,10 @@ class ACTBoltzmannBase(Theory):
         return True
 
     def translate_param(self, p):
-        return self.renames.get(p, p)[3:]
+        return self.renames.get(p, p)
 
     def get_param(self, p):
-        # self.log.debug(f'{p=}')
         translated = self.translate_param(p)
-        # self.log.debug(f'{translated=}')
-        translated = p
-        self.log.debug(f"{self.current_state=}")
         for pool in ["params", "derived", "derived_extra"]:
             value = (self.current_state[pool] or {}).get(translated, None)
             if value is not None:
@@ -164,18 +160,18 @@ class ACTBoltzmannBase(Theory):
         # e.g. take maximum of all values of a requested precision parameter
         for k, v in requirements.items():
             # Products and other computations
-            if k == "ACTCl":
+            if k == "Cl":
                 current = self._must_provide.get(k, {})
                 v = {cl.lower(): v[cl] for cl in v}  # to lowercase
                 self._must_provide[k] = {
                     cl.lower(): max(current.get(cl.lower(), 0), v.get(cl, 0))
                     for cl in set(current).union(v)}
-            elif k == "ACTunlensed_Cl":
+            elif k == "unlensed_Cl":
                 current = self._must_provide.get(k, {})
                 self._must_provide[k] = {
                     cl.lower(): max(current.get(cl.lower(), 0), v.get(cl, 0))
                     for cl in set(current).union(v)}
-            elif k == 'ACTsigma_R':
+            elif k == 'sigma_R':
                 self._check_args(k, v, ('z', 'R'))
                 for pair in self._norm_vars_pairs(v.pop("vars_pairs", []), k):
                     k = ("sigma_R",) + pair
@@ -185,7 +181,7 @@ class ACTBoltzmannBase(Theory):
                         "z": combine_1d(v["z"], current.get("z")),
                         "k_max": max(current.get("k_max", 0),
                                      v.get("k_max", 2 / np.min(v["R"])))}
-            elif k in ("ACTPk_interpolator", "ACTPk_grid"):
+            elif k in ("Pk_interpolator", "Pk_grid"):
                 # arguments are all identical, collect all in Pk_grid
                 self._check_args(k, v, ('z', 'k_max'))
                 redshifts = v.pop("z")
@@ -201,7 +197,7 @@ class ACTBoltzmannBase(Theory):
                             nonlinear=nonlinear,
                             z=combine_1d(redshifts, current.get("z")),
                             k_max=max(current.get("k_max", 0), k_max), **v)
-            elif k == "ACTsource_Cl":
+            elif k == "source_Cl":
                 if k not in self._must_provide:
                     self._must_provide[k] = {}
                 if "sources" not in v:
@@ -219,9 +215,9 @@ class ACTBoltzmannBase(Theory):
                 #                 "Source %r requested twice with different specification"
                 #                 ": %r vs %r.", source, window, self.sources[source])
                 self._must_provide[k].update(v)
-            elif k in {"ACTHubble", "ACTOmega_b", "ACTOmega_cdm", "ACTOmega_nu_massive",
-                       "ACTangular_diameter_distance", "ACTcomoving_radial_distance",
-                       "ACTsigma8_z", "ACTfsigma8"}:
+            elif k in {"Hubble", "Omega_b", "Omega_cdm", "Omega_nu_massive",
+                       "angular_diameter_distance", "comoving_radial_distance",
+                       "sigma8_z", "fsigma8"}:
                 if k not in self._must_provide:
                     self._must_provide[k] = {}
                 if not isinstance(v, Mapping) or "z" not in v:
@@ -233,7 +229,7 @@ class ACTBoltzmannBase(Theory):
                     )
                 self._must_provide[k]["z"] = combine_1d(
                     v["z"], self._must_provide[k].get("z"))
-            elif k == "ACTangular_diameter_distance_2":
+            elif k == "angular_diameter_distance_2":
                 if k not in self._must_provide:
                     self._must_provide[k] = {}
                 zs = v.pop("z_pairs", None)
@@ -320,7 +316,7 @@ class ACTBoltzmannBase(Theory):
                               units, list(units_factors))
 
     @abstract
-    def get_ACTCl(self, ell_factor=False, units="FIRASmuK2"):
+    def get_Cl(self, ell_factor=False, units="FIRASmuK2"):
         r"""
         Returns a dictionary of lensed CMB power spectra and the lensing potential ``pp``
         power spectrum.
@@ -338,7 +334,7 @@ class ACTBoltzmannBase(Theory):
         """
 
     @abstract
-    def get_ACTunlensed_Cl(self, ell_factor=False, units="FIRASmuK2"):
+    def get_unlensed_Cl(self, ell_factor=False, units="FIRASmuK2"):
         r"""
         Returns a dictionary of unlensed CMB power spectra.
 
@@ -348,7 +344,7 @@ class ACTBoltzmannBase(Theory):
         :math:`\ell(\ell+1)/(2\pi)`.
         """
 
-    def get_ACTHubble(self, z, units="km/s/Mpc"):
+    def get_Hubble(self, z, units="km/s/Mpc"):
         r"""
         Returns the Hubble rate at the given redshift(s) ``z``.
 
@@ -364,7 +360,7 @@ class ACTBoltzmannBase(Theory):
                 self.log, "Units not known for H: '%s'. Try instead one of %r.",
                 units, list(H_units_conv_factor))
 
-    def get_ACTOmega_b(self, z):
+    def get_Omega_b(self, z):
         r"""
         Returns the Baryon density parameter at the given redshift(s) ``z``.
 
@@ -373,7 +369,7 @@ class ACTBoltzmannBase(Theory):
         """
         return self._get_z_dependent("Omega_b", z)
 
-    def get_ACTOmega_cdm(self, z):
+    def get_Omega_cdm(self, z):
         r"""
         Returns the Cold Dark Matter density parameter at the given redshift(s) ``z``.
 
@@ -382,7 +378,7 @@ class ACTBoltzmannBase(Theory):
         """
         return self._get_z_dependent("Omega_cdm", z)
 
-    def get_ACTOmega_nu_massive(self, z):
+    def get_Omega_nu_massive(self, z):
         r"""
         Returns the Massive neutrinos' density parameter at the given redshift(s) ``z``.
 
@@ -391,7 +387,7 @@ class ACTBoltzmannBase(Theory):
         """
         return self._get_z_dependent("Omega_nu_massive", z)
 
-    def get_ACTangular_diameter_distance(self, z):
+    def get_angular_diameter_distance(self, z):
         r"""
         Returns the physical angular diameter distance in :math:`\mathrm{Mpc}` to the
         given redshift(s) ``z``.
@@ -401,7 +397,7 @@ class ACTBoltzmannBase(Theory):
         """
         return self._get_z_dependent("angular_diameter_distance", z)
 
-    def get_ACTangular_diameter_distance_2(self, z_pairs):
+    def get_angular_diameter_distance_2(self, z_pairs):
         r"""
         Returns the physical angular diameter distance between pairs of redshifts
         `z_pairs` in :math:`\mathrm{Mpc}`.
@@ -414,7 +410,7 @@ class ACTBoltzmannBase(Theory):
         return self._get_z_pair_dependent(
             "angular_diameter_distance_2", z_pairs, inv_value=0)
 
-    def get_ACTcomoving_radial_distance(self, z):
+    def get_comoving_radial_distance(self, z):
         r"""
         Returns the comoving radial distance in :math:`\mathrm{Mpc}` to the given
         redshift(s) ``z``.
@@ -424,7 +420,7 @@ class ACTBoltzmannBase(Theory):
         """
         return self._get_z_dependent("comoving_radial_distance", z)
 
-    def get_ACTPk_interpolator(self, var_pair=("delta_tot", "delta_tot"), nonlinear=True,
+    def get_Pk_interpolator(self, var_pair=("delta_tot", "delta_tot"), nonlinear=True,
                             extrap_kmin=None, extrap_kmax=None):
         r"""
         Get a :math:`P(z,k)` bicubic interpolation object
@@ -443,11 +439,11 @@ class ACTBoltzmannBase(Theory):
         :return: :class:`PowerSpectrumInterpolator` instance.
         """
         nonlinear = bool(nonlinear)
-        key = (("ACTPk_interpolator", nonlinear, extrap_kmin, extrap_kmax) +
+        key = (("Pk_interpolator", nonlinear, extrap_kmin, extrap_kmax) +
                tuple(sorted(var_pair)))
         if key in self.current_state:
             return self.current_state[key]
-        k, z, pk = self.get_ACTPk_grid(var_pair=var_pair, nonlinear=nonlinear)
+        k, z, pk = self.get_Pk_grid(var_pair=var_pair, nonlinear=nonlinear)
         log_p = True
         sign = 1
         if np.any(pk < 0):
@@ -463,13 +459,13 @@ class ACTBoltzmannBase(Theory):
             raise LoggedError(self.log,
                               'Cannot do log extrapolation with zero-crossing pk '
                               'for %s, %s' % var_pair)
-        result = ACTPowerSpectrumInterpolator(
+        result = PowerSpectrumInterpolator(
             z, k, pk, logP=log_p, logsign=sign,
             extrap_kmin=extrap_kmin, extrap_kmax=extrap_kmax)
         self.current_state[key] = result
         return result
 
-    def get_ACTPk_grid(self, var_pair=("delta_tot", "delta_tot"), nonlinear=True):
+    def get_Pk_grid(self, var_pair=("delta_tot", "delta_tot"), nonlinear=True):
         r"""
         Get  matter power spectrum, e.g. suitable for splining.
         Returned arrays may be bigger or more densely sampled than requested, but will
@@ -488,15 +484,15 @@ class ACTBoltzmannBase(Theory):
         """
         try:
             return self.current_state[
-                ("ACTPk_grid", bool(nonlinear)) + tuple(sorted(var_pair))]
+                ("Pk_grid", bool(nonlinear)) + tuple(sorted(var_pair))]
         except KeyError:
-            if ("ACTPk_grid", False) + tuple(sorted(var_pair)) in self.current_state:
+            if ("Pk_grid", False) + tuple(sorted(var_pair)) in self.current_state:
                 raise LoggedError(self.log,
                                   "Getting non-linear matter power but 'nonlinear' "
                                   "not specified in requirements")
             raise LoggedError(self.log, "Matter power %s, %s not computed" % var_pair)
 
-    def get_ACTsigma_R(self, var_pair=("delta_tot", "delta_tot")):
+    def get_sigma_R(self, var_pair=("delta_tot", "delta_tot")):
         r"""
         Get :math:`\sigma_R(z)`, the RMS power in a sphere of radius :math:`R` at
         redshift :math:`z`.
@@ -518,14 +514,14 @@ class ACTBoltzmannBase(Theory):
             raise LoggedError(self.log, "sigmaR %s not computed" % var_pair)
 
     @abstract
-    def get_ACTsource_Cl(self):
+    def get_source_Cl(self):
         r"""
         Returns a dict of power spectra of for the computed sources, with keys a tuple of
         sources ``([source1], [source2])``, and an additional key ``ell`` containing the
         multipoles.
         """
 
-    def get_ACTsigma8_z(self, z):
+    def get_sigma8_z(self, z):
         r"""
         Present day linear theory root-mean-square amplitude of the matter
         fluctuation spectrum averaged in spheres of radius 8 h^{−1} Mpc.
@@ -535,7 +531,7 @@ class ACTBoltzmannBase(Theory):
         """
         return self._get_z_dependent("sigma8_z", z)
 
-    def get_ACTfsigma8(self, z):
+    def get_fsigma8(self, z):
         r"""
         Structure growth rate :math:`f\sigma_8`, as defined in eq. 33 of
         `Planck 2015 results. XIII.
@@ -547,7 +543,7 @@ class ACTBoltzmannBase(Theory):
         """
         return self._get_z_dependent("fsigma8", z)
 
-    def get_ACTauto_covmat(self, params_info, likes_info, random_state=None):
+    def get_auto_covmat(self, params_info, likes_info, random_state=None):
         r"""
         Tries to get match to a database of existing covariance matrix files for the
         current model and data.
@@ -559,7 +555,7 @@ class ACTBoltzmannBase(Theory):
                                    random_state)
 
 
-class ACTPowerSpectrumInterpolator(RectBivariateSpline):
+class PowerSpectrumInterpolator(RectBivariateSpline):
     r"""
     2D spline interpolation object (scipy.interpolate.RectBivariateSpline)
     to evaluate matter power spectrum as function of z and k.
