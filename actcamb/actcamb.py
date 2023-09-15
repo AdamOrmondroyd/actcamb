@@ -339,7 +339,7 @@ class ACTCAMB(ACTBoltzmannBase):
     def initialize_with_params(self):
         # must set WantTensors manually if using external_primordial_pk
         if not self.external_primordial_pk \
-                and set(self.input_params).intersection({'r', 'At'}):
+                and set(self.input_params).intersection({'ACTr', 'ACTAt'}):
             self.extra_attrs["WantTensors"] = True
             self.extra_attrs["Accuracy.AccurateBB"] = True
 
@@ -1074,10 +1074,10 @@ class ACTCambTransfers(HelperTheory):
 
     def initialize_with_params(self):
         if len(set(self.input_params).intersection(
-                {"H0", "cosmomc_theta", "thetastar"})) > 1:
+                {"ACTH0", "ACTcosmomc_theta", "ACTthetastar"})) > 1:
             raise LoggedError(self.log, "Can't pass more than one of H0, "
                                         "theta, cosmomc_theta to CAMB.")
-        if len(set(self.input_params).intersection({"tau", "zrei"})) > 1:
+        if len(set(self.input_params).intersection({"ACTtau", "ACTzrei"})) > 1:
             raise LoggedError(self.log, "Can't pass more than one of tau and zrei "
                                         "to CAMB.")
 
