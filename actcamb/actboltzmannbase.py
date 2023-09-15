@@ -45,7 +45,11 @@ class ACTBoltzmannBase(Theory):
         return self.renames.get(p, p)[3:]
 
     def get_param(self, p):
+        # self.log.debug(f'{p=}')
         translated = self.translate_param(p)
+        # self.log.debug(f'{translated=}')
+        translated = p
+        self.log.debug(f"{self.current_state=}")
         for pool in ["params", "derived", "derived_extra"]:
             value = (self.current_state[pool] or {}).get(translated, None)
             if value is not None:
