@@ -1029,7 +1029,7 @@ class ACTCambTransfers(HelperTheory):
         self.cobaya_camb.check_no_repeated_input_extra()
 
     def get_ACTCAMB_transfers(self):
-        return self.current_state['results']
+        return self.current_state['ACTresults']
 
     def calculate(self, state, want_derived=True, **params_values_dict):
         # Set parameters
@@ -1056,7 +1056,7 @@ class ACTCambTransfers(HelperTheory):
             else:
                 results = self.camb.get_transfer_functions(camb_params) \
                     if self.needs_perts else self.camb.get_background(camb_params)
-            state['results'] = (camb_params, results)
+            state['ACTresults'] = (camb_params, results)
         except self.camb.baseconfig.CAMBError as e:
             if self.stop_at_error:
                 self.log.error(
