@@ -397,7 +397,6 @@ class ACTCAMB(ACTBoltzmannBase):
         # accumulated, i.e. taking the max of precision requests, etc.
         super().must_provide(**requirements)
         CAMBdata = self.camb.CAMBdata
-        # self.log.debug(f"{requirements}")
 
         for k, v in self._must_provide.items():
             # Products and other computations
@@ -558,8 +557,6 @@ class ACTCAMB(ACTBoltzmannBase):
                 must_provide['primordial_tensor_pk'] = {'lmax':
                     self.extra_attrs.get(
                         "max_l_tensor", self.extra_args.get("lmax"))}
-        # act_must_provide: InfoDict = {}
-        # self.log.debug(f"{must_provide=}")
         return must_provide
 
     def add_to_redshifts(self, z):
@@ -592,11 +589,6 @@ class ACTCAMB(ACTBoltzmannBase):
             method=method, z_pool=z_pool, kwargs=kwargs_with_z, args=args)
 
     def calculate(self, state, want_derived=True, **params_values_dict):
-        # temp = {}
-        # for k, v in params_values_dict.items():
-        #     if "ACT" == k[:3]:
-        #         temp[k[3:]] = v
-        # params_values_dict = temp
         try:
             params, results = self.provider.get_ACTCAMB_transfers()
             if self.collectors or 'ACTsigma8' in self.derived_extra:
@@ -668,8 +660,6 @@ class ACTCAMB(ACTBoltzmannBase):
         # Prepare necessary extra derived parameters
         state["derived_extra"] = {
             p: self._get_derived(self.translate_param(p), intermediates) for p in self.derived_extra}
-        self.log.debug(f"{state=}")
-        self.log.debug("end state")
 
     @staticmethod
     def _get_derived(p, intermediates):
@@ -705,8 +695,6 @@ class ACTCAMB(ACTBoltzmannBase):
         """
         derived = {}
         for p in self.output_params:
-            # self.log.debug(f"{p=}")
-            # self.log.debug(f"{self.translate_param(p)=}")
             derived[p] = self._get_derived(self.translate_param(p), intermediates)
             if derived[p] is None:
                 raise LoggedError(self.log, "Derived param '%s' not implemented"
@@ -819,7 +807,6 @@ class ACTCAMB(ACTBoltzmannBase):
 
     def set(self, params_values_dict, state):
         # Prepare parameters to be passed: this is called from the CambTransfers instance
-        # self.log.debug(f"{state=}")
         args = {self.translate_param(p): v for p, v in params_values_dict.items()}
         # Generate and save
         self.log.debug("Setting parameters: %r and %r", args, self.extra_args)
@@ -1033,14 +1020,6 @@ class ACTCambTransfers(HelperTheory):
 
     def calculate(self, state, want_derived=True, **params_values_dict):
         # Set parameters
-        # self.log.debug(f"{params_values_dict}")
-        # temp = {}
-        # for k, v in params_values_dict.items():
-        #     if "ACT" == k[:3]:
-        #         temp[k[3:]] = v
-        # params_values_dict = temp
-        # self.log.debug(f"{params_values_dict}")
-        # self.log.debug(f"{state=}")
         camb_params = self.cobaya_camb.set(params_values_dict, state)
         # Failed to set parameters but no error raised
         # (e.g. out of computationally feasible range): lik=0
